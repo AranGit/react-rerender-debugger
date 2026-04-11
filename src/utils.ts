@@ -7,33 +7,42 @@ export function getChangedProps(
   nextProps: Record<string, any>,
   depth: number = 1
 ): string[] {
-  const allKeys = Array.from(new Set([...Object.keys(prevProps), ...Object.keys(nextProps)]));
   const changed: string[] = [];
 
-  allKeys.forEach((key) => {
-    if (prevProps[key] !== nextProps[key]) {
-      // Shallow difference detected
-      
-      // If we want to support depth > 1 for objects (React props usually shallow compared)
-      if (
-        depth > 1 &&
-        typeof prevProps[key] === 'object' && prevProps[key] !== null &&
-        typeof nextProps[key] === 'object' && nextProps[key] !== null &&
-        !Array.isArray(prevProps[key]) // Skip arrays for simplicity, or we can deep compare them too
-      ) {
-        const nestedChanges = getChangedProps(prevProps[key], nextProps[key], depth - 1);
-        if (nestedChanges.length > 0) {
-          nestedChanges.forEach(nestedKey => {
-            changed.push(`${key}.${nestedKey}`);
-          });
-        } else {
-           // Reference changed but values are same.
-           changed.push(key);
+  const compare = (prev: any, next: any, path: string, currentDepth: number) => {
+    if (prev === next) return;
+
+    if (
+      currentDepth > 0 &&
+      typeof prev === 'object' && prev !== null &&
+      typeof next === 'object' && next !== null &&
+      !Array.isArray(prev) && !Array.isArray(next)
+    ) {
+      const allKeys = Array.from(new Set([...Object.keys(prev), ...Object.keys(next)]));
+      let internalChange = false;
+
+      allKeys.forEach((key) => {
+        if (prev[key] !== next[key]) {
+          internalChange = true;
+          const newPath = path ? `${path}.${key}` : key;
+          compare(prev[key], next[key], newPath, currentDepth - 1);
         }
-      } else {
-        changed.push(key);
+      });
+
+      if (!internalChange && path !== '') {
+        // Reference changed but shallower properties are the same
+        changed.push(path);
+      }
+    } else {
+      if (path !== '') {
+        changed.push(path);
       }
     }
+  };
+
+  const allTopKeys = Array.from(new Set([...Object.keys(prevProps || {}), ...Object.keys(nextProps || {})]));
+  allTopKeys.forEach(key => {
+    compare(prevProps[key], nextProps[key], key, depth);
   });
 
   return changed;

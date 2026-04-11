@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, ReactNode } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, ReactNode } from 'react';
 import { getChangedProps } from './utils';
 
 export interface RenderTraceConfig {
@@ -33,6 +33,19 @@ export const RenderTraceDev: React.FC<RenderTraceDevProps> = ({
   
   const isInternalRender = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const renderStartTimeRef = useRef(0);
+  const lastRenderTimeRef = useRef(0);
+
+  // Track the start of every render phase
+  renderStartTimeRef.current = performance.now();
+
+  useLayoutEffect(() => {
+    if (!isInternalRender.current) {
+      // Calculate time taken for render + commit
+      lastRenderTimeRef.current = performance.now() - renderStartTimeRef.current;
+    }
+  });
 
   useEffect(() => {
     if (isInternalRender.current) {
@@ -138,7 +151,10 @@ export const RenderTraceDev: React.FC<RenderTraceDevProps> = ({
           }}
         >
           <div style={{ fontWeight: 'bold' }}>
-            {name} <span style={{ color }}>{renderCountRef.current}</span>
+            {name} <span style={{ color }}>#{renderCountRef.current}</span>
+            <span style={{ color: '#aaa', marginLeft: '6px', fontWeight: 'normal' }}>
+              ({lastRenderTimeRef.current.toFixed(1)} ms)
+            </span>
           </div>
           {causes.map((cause, idx) => (
             <div key={idx} style={{ color: '#aaa', fontSize: '9px' }}>

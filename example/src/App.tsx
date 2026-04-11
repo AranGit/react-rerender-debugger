@@ -18,20 +18,28 @@ const UserCard = ({ user }: { user: { name: string; id: number } }) => {
   );
 };
 
-// ⚠️ React Note: The component rendered inside App is actually the HOC wrapper (TracedUserCard).
+// React Note: The component rendered inside App is actually the HOC wrapper (TracedUserCard).
 // Therefore, to prevent the wrapper from re-rendering and flashing unnecessarily,
 // we must apply React.memo() to the returned HOC output, rather than just the internal component!
 const TracedUserCard = memo(
-  withRenderTrace(UserCard, { color: "#00ff00", duration: 500 }),
+  withRenderTrace(
+    UserCard,
+    { color: "#00ff00", duration: 500 },
+    "UserCard With Memo",
+  ),
 );
-const TracedUserCardWithoutMemo = withRenderTrace(UserCard, {
-  color: "#f6ff00ff",
-  duration: 500,
-});
+const TracedUserCardWithoutMemo = withRenderTrace(
+  UserCard,
+  {
+    color: "#f6ff00ff",
+    duration: 500,
+  },
+  "UserCard Without Memo",
+);
 
 function App() {
   const [count, setCount] = useState(0);
-  const [user, setUser] = useState({ name: "Alice", id: 1 });
+  const [user, setUser] = useState({ name: "Phop", id: 1 });
 
   useEffect(() => {
     // Triggers a random re-render just to show the flashing
@@ -40,6 +48,15 @@ function App() {
     }, 2000);
     return () => clearInterval(interval);
   }, []);
+
+  const buttonStyle: React.CSSProperties = {
+    padding: "8px 16px",
+    cursor: "pointer",
+    background: "#444",
+    color: "white",
+    border: "none",
+    borderRadius: "4px",
+  };
 
   return (
     <div
@@ -54,19 +71,23 @@ function App() {
         Every 2 seconds `count` increases. See how the wrapper visualizes it.
       </p>
 
-      <div style={{ marginBottom: "24px" }}>
+      <div style={{ marginBottom: "24px", display: "flex", gap: "8px" }}>
         <button
           onClick={() => setUser({ ...user, id: user.id + 1 })}
-          style={{
-            padding: "8px 16px",
-            cursor: "pointer",
-            background: "#444",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-          }}
+          style={buttonStyle}
         >
           Change User Props (ID)
+        </button>
+        <button
+          onClick={() =>
+            setUser({
+              ...user,
+              name: user.name === "Phop" ? "Mr.Phop" : "Phop",
+            })
+          }
+          style={buttonStyle}
+        >
+          Change User Props (Name)
         </button>
       </div>
 
