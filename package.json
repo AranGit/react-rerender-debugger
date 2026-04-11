@@ -1,0 +1,32 @@
+{
+  "name": "react-rerender-debugger",
+  "version": "1.0.0",
+  "description": "A lightweight React/Next.js wrapper to visually debug and analyze component re-renders with zero production overhead.",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch"
+  },
+  "keywords": [
+    "react",
+    "nextjs",
+    "rerender",
+    "debug",
+    "profiler",
+    "performance"
+  ],
+  "author": "AranGit",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "react-dom": ">=16.8.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  }
+}
