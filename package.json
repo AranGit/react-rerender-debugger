@@ -9,6 +9,12 @@
     "build": "tsup src/index.ts --format cjs,esm --dts",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch"
   },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "package.json"
+  ],
   "keywords": [
     "react",
     "nextjs",
