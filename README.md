@@ -88,16 +88,6 @@ If you want to track specific states, you can explicitly pass them via the `trac
 
 ---
 
-## Testing / Playground
-
-We have included a full Vite React development playground directly inside this repository. You can use it to test modifications or see the library in action without installing it elsewhere.
-
-1. Navigate to the `example/` directory.
-2. Run `npm install` (this will install React, Vite, and link the local library folder `file:..`).
-3. Run `npm run dev` to start discovering re-renders live in your browser!
-
----
-
 ## Environment Isolation
 
 We designed `react-rerender-debugger` to be left inside your codebase without fear. 
