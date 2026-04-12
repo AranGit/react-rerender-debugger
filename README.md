@@ -79,7 +79,10 @@ Both `<RenderTrace>` and `withRenderTrace` accept a `config` object:
 | `hotRenderThresholdMs` | `number` | `16` | If `flashOnDOMUpdateOnly` is enabled, and the V-DOM evaluation takes longer than this threshold, it overrides the DOM check and fires a **Hot Render Warning** (orange flash). |
 | `vdomRenderIndicator` | `'dot' \| 'badge' \| 'none'` | `'dot'` | When `flashOnDOMUpdateOnly` is enabled, decides what to show for fast V-DOM only renders. |
 | `as` | `string` | `'div'` | The HTML tag used as the wrapper. Adjust this (e.g. `'span'` or `'tr'`) to prevent CSS flexbox/grid breakages. |
+| `wrapperClassName` | `string` | `undefined` | Passthrough CSS class directly applied to the wrapper element for advanced layout control. |
+| `wrapperStyle` | `object` | `undefined` | Passthrough inline styles directly applied to the wrapper element for advanced layout control. |
 | `ignoreFunctions` | `boolean` | `false` | If `true`, ignores inline function references (`onClick={() => set()}`) from causing false positive alerts. |
+| `ignoreReactNodes` | `boolean` | `true` | If `true`, gracefully ignores false positive noises caused by React elements passed via props (e.g. `children`), since new V-DOM elements change reference endlessly. |
 
 ### Tracking Internal State / Context
 
@@ -107,3 +110,23 @@ export const RenderTrace = process.env.NODE_ENV === 'production'
 ```
 
 When building your app for production (Next.js, Vite, Webpack, Rollup), the bundler recognizes `process.env.NODE_ENV === 'production'` is `true`, and **completely strips out all debugging logic**. The compiled wrapper becomes a literal React Fragment, adding absolutely **zero processing overhead, zero DOM wrappers, and zero bundle size** to your production applications.
+
+---
+
+## Known Limitations
+
+While `react-rerender-debugger` covers the vast majority of debugging needs with zero production overhead, the following edge cases exist due to constraints in React and the DOM Observer API:
+
+1. **React Portals (`createPortal`)**: Content rendered into external portals (e.g. `document.body`) is not observable by `MutationObserver` which is scoped to the wrapper element. In Smart DOM mode, these mutations will appear as silent V-DOM-only renders even if real DOM was updated.
+
+2. **React 18 Concurrent Features (`useTransition`, `useDeferredValue`, etc.)**: React may evaluate a component's render function multiple times before a single commit phase in concurrent mode. The Render Duration (`ms`) value reflects only the final synchronous pass, not the sum of all interrupted evaluations.
+
+3. **`useRef` Mutations**: Mutating a `ref.current` does not trigger React's prop/state change detection. If a re-render is caused purely by a ref mutation, the tool will display `"State/Context change"` generically. Use the `track` prop to explicitly surface ref values you care about: `track={{ myRef: myRef.current }}`.
+
+4. **JS-only Render Timing**: The `ms` value covers JavaScript execution time only (the component function body). It does not account for subsequent browser work such as CSS recalculation, layout, paint, or compositor steps. A component with a 1ms JS render can still cause expensive layout reflows if it triggers forced layout reads/writes.
+
+5. **Context Identity**: When a component re-renders due to a Context value change, the tool correctly logs `"State/Context change"` — but it cannot identify *which* Context triggered the update. This is a React API limitation; context subscriptions are internal to React and not observable from a wrapper component.
+
+## License
+
+MIT

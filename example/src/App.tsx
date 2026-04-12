@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useState, forwardRef, useRef } from "react";
 import { RenderTrace, withRenderTrace } from "react-rerender-debugger";
 
 // An internal component
@@ -57,6 +57,21 @@ const SmartHeavyTraced = withRenderTrace(
   "Smart Heavy Trace"
 );
 
+// Example 5: Children Noise Component
+const LayoutCard = ({ children, title }: { children: React.ReactNode, title: string }) => {
+   return <div style={{ border: '1px dashed #666', padding: '16px', borderRadius: '4px' }}>
+     <strong style={{ display: 'block', marginBottom: '8px' }}>{title}</strong>
+     {children}
+   </div>
+};
+const TraceLayout = withRenderTrace(LayoutCard, { color: '#00ffff' }, 'Children Trace');
+
+// Example 6: Forward Ref Component
+const RefInput = forwardRef<HTMLInputElement, { placeholder: string }>((props, ref) => {
+   return <input ref={ref} placeholder={props.placeholder} style={{ padding: '8px', borderRadius: '4px', border: 'none', color: '#000', width: '100%', boxSizing: 'border-box' }} />
+});
+const TraceInput = withRenderTrace(RefInput, { color: '#ffccaa' }, 'ForwardRef Trace');
+
 // Traditional approach: Memoizing the component to prevent V-DOM runs
 const MemoTraced = memo(
   withRenderTrace(
@@ -69,6 +84,7 @@ const MemoTraced = memo(
 function App() {
   const [ticker, setTicker] = useState(0);
   const [user, setUser] = useState({ name: "Phop", id: 1 });
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Triggers a random re-render just to show the flashing
@@ -91,7 +107,8 @@ function App() {
   return (
     <div
       style={{
-        maxWidth: "600px",
+        maxWidth: "1400px",
+        padding: "0 20px",
         margin: "40px auto",
         fontFamily: "sans-serif",
       }}
@@ -101,7 +118,7 @@ function App() {
         Every 2.5 seconds `ticker` increases (Parent State Change). Watch how different tools react.
       </p>
 
-      <div style={{ marginBottom: "24px", display: "flex", gap: "8px" }}>
+      <div style={{ marginBottom: "24px", display: "flex", flexWrap: "wrap", gap: "8px" }}>
         <button
           onClick={() => setUser({ ...user, id: user.id + 1 })}
           style={buttonStyle}
@@ -144,7 +161,11 @@ function App() {
         >
           <h2>Layout Content (Ticker: {ticker})</h2>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+            gap: '24px' 
+          }}>
             
             {/* Box 1: Standard Trace */}
             <div style={{ background: '#333', padding: '16px', borderRadius: '8px' }}>
@@ -189,6 +210,37 @@ function App() {
                 It stops the flash, but you pay the CPU cost of deep prop comparison on every render, which is often slower than just letting V-DOM run!
               </p>
               <MemoTraced user={user} />
+            </div>
+          </div>
+
+          <h2 style={{ marginTop: '48px', paddingTop: '24px', borderTop: '1px solid #444' }}>Edge Cases (Advanced)</h2>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+            gap: '24px' 
+          }}>
+            {/* Box 5: Children Trap */}
+            <div style={{ background: '#333', padding: '16px', borderRadius: '8px' }}>
+               <h3 style={{ margin: '0 0 8px 0', color: '#00ffff' }}>5. Children Prop Noise</h3>
+               <p style={{ fontSize: '14px', color: '#ccc', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+                 In React, <code>props.children</code> creates a new object on every parent render! Older tools scream endlessly. <br/>
+                 With <code>ignoreReactNodes: true</code>, we stay dead silent!
+               </p>
+               <TraceLayout title={`Parent Ticker: ${ticker}`}>
+                  <p style={{ margin: 0, padding: '8px', background: '#444' }}>I am passed via children props</p>
+               </TraceLayout>
+            </div>
+
+            {/* Box 6: Forward Ref */}
+            <div style={{ background: '#333', padding: '16px', borderRadius: '8px' }}>
+               <h3 style={{ margin: '0 0 8px 0', color: '#ffccaa' }}>6. ForwardRef Safety</h3>
+               <p style={{ fontSize: '14px', color: '#ccc', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+                 The HOC passes <code>ref</code> through to custom components flawlessly without breaking typescript.
+               </p>
+               <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+                  <TraceInput placeholder="Type..." ref={inputRef} />
+                  <button onClick={() => inputRef.current?.focus()} style={buttonStyle}>Focus via Ref</button>
+               </div>
             </div>
           </div>
         </div>
