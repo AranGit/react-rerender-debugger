@@ -6,9 +6,11 @@ With `react-rerender-debugger`, you can wrap any component and instantly underst
 
 ## Features
 - **Visual Flashing Indicator**: Components flash whenever they re-render.
+- **Smart DOM Tracking**: Differentiate between harmless Virtual DOM re-renders and costly Real DOM mutations. Wait for actual mutations to flash, avoiding the "Memo trap" (over-engineering with useMemo).
 - **Render Analytics**: Displays real-time render counts and exact causes (`Changed: props.user.id`).
 - **Zero Production Overhead**: Fully isolated. In production mode, the library is a complete No-Op and leaves your DOM completely untouched.
-- **Smart Value Comparison**: Deep/Shallow props inspection.
+- **Smart Value Comparison**: Deep/Shallow props inspection. Can ignore inline function changes gracefully.
+- **Next.js App Router Support**: Seamless integration as a Client Component across all modern React frameworks.
 - **Lightweight & Zero-Dependency**: Ships only exactly what is needed for local development.
 
 ---
@@ -73,6 +75,10 @@ Both `<RenderTrace>` and `withRenderTrace` accept a `config` object:
 | `color` | `string` | `'#ff0000'` | The color of the flashing border and the badge text. |
 | `duration` | `number` | `300` | How long the border flashes in milliseconds. |
 | `depth` | `number` | `1` | Depth of object comparison. `1` means shallow comparison. `2` means it will check one level inside props to report `props.user.name` changed. |
+| `flashOnDOMUpdateOnly` | `boolean` | `false` | If `true`, the UI will only flash if the Real DOM actually mutates. Great for avoiding unnecessary `useMemo` optimizations! |
+| `vdomRenderIndicator` | `'dot' \| 'badge' \| 'none'` | `'dot'` | When `flashOnDOMUpdateOnly` is enabled, decides what to show for V-DOM only renders. |
+| `as` | `string` | `'div'` | The HTML tag used as the wrapper. Adjust this (e.g. `'span'` or `'tr'`) to prevent CSS flexbox/grid breakages. |
+| `ignoreFunctions` | `boolean` | `false` | If `true`, ignores inline function references (`onClick={() => set()}`) from causing false positive alerts. |
 
 ### Tracking Internal State / Context
 
