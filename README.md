@@ -76,7 +76,8 @@ Both `<RenderTrace>` and `withRenderTrace` accept a `config` object:
 | `duration` | `number` | `300` | How long the border flashes in milliseconds. |
 | `depth` | `number` | `1` | Depth of object comparison. `1` means shallow comparison. `2` means it will check one level inside props to report `props.user.name` changed. |
 | `flashOnDOMUpdateOnly` | `boolean` | `false` | If `true`, the UI will only flash if the Real DOM actually mutates. Great for avoiding unnecessary `useMemo` optimizations! |
-| `vdomRenderIndicator` | `'dot' \| 'badge' \| 'none'` | `'dot'` | When `flashOnDOMUpdateOnly` is enabled, decides what to show for V-DOM only renders. |
+| `hotRenderThresholdMs` | `number` | `16` | If `flashOnDOMUpdateOnly` is enabled, and the V-DOM evaluation takes longer than this threshold, it overrides the DOM check and fires a **Hot Render Warning** (orange flash). |
+| `vdomRenderIndicator` | `'dot' \| 'badge' \| 'none'` | `'dot'` | When `flashOnDOMUpdateOnly` is enabled, decides what to show for fast V-DOM only renders. |
 | `as` | `string` | `'div'` | The HTML tag used as the wrapper. Adjust this (e.g. `'span'` or `'tr'`) to prevent CSS flexbox/grid breakages. |
 | `ignoreFunctions` | `boolean` | `false` | If `true`, ignores inline function references (`onClick={() => set()}`) from causing false positive alerts. |
 

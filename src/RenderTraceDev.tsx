@@ -14,6 +14,7 @@ export interface RenderTraceConfig {
   duration?: number;
   depth?: number;
   flashOnDOMUpdateOnly?: boolean;
+  hotRenderThresholdMs?: number;
   vdomRenderIndicator?: "none" | "dot" | "badge";
   as?: React.ElementType;
   ignoreFunctions?: boolean;
@@ -24,7 +25,7 @@ export interface RenderTraceDevProps {
   name?: string;
   config?: RenderTraceConfig;
   track?: Record<string, any>;
-  [key: string]: any; // other props to pass down or just arbitrary props passed to compare
+  [key: string]: any;
 }
 
 export const RenderTraceDev: React.FC<RenderTraceDevProps> = ({
@@ -39,6 +40,7 @@ export const RenderTraceDev: React.FC<RenderTraceDevProps> = ({
     duration = 300,
     depth = 1,
     flashOnDOMUpdateOnly = false,
+    hotRenderThresholdMs = 16, // Default 16ms to flag frames drop
     vdomRenderIndicator = "dot",
     as = "div",
     ignoreFunctions = false,
@@ -51,10 +53,12 @@ export const RenderTraceDev: React.FC<RenderTraceDevProps> = ({
   const prevPropsRef = useRef<Record<string, any>>({});
   const prevTrackRef = useRef<Record<string, any>>({});
 
-  const [isFlashing, setIsFlashing] = useState(false);
+  const [flashState, setFlashState] = useState<'none' | 'normal' | 'hot'>('none');
   const [causes, setCauses] = useState<string[]>([]);
-  const [pendingCauses, setPendingCauses] = useState<string[]>([]); // Causes waiting for DOM update
-  const [hasVdomRendered, setHasVdomRendered] = useState(false); // To show vdom indicator
+  const [hasVdomRendered, setHasVdomRendered] = useState(false);
+  
+  // Use ref to hold pending causes so we don't trigger unnecessary re-renders while waiting for DOM mutations
+  const pendingCausesRef = useRef<string[]>([]);
 
   const isInternalRender = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -65,11 +69,41 @@ export const RenderTraceDev: React.FC<RenderTraceDevProps> = ({
   // Track the start of every render phase
   renderStartTimeRef.current = performance.now();
 
+  const triggerFlash = (c: string[], type: 'normal' | 'hot' = 'normal') => {
+    isInternalRender.current = true;
+    renderCountRef.current += 1;
+    setCauses(c);
+    setFlashState(type);
+    setHasVdomRendered(false);
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    timeoutRef.current = setTimeout(() => {
+      isInternalRender.current = true;
+      setFlashState('none');
+    }, duration);
+  };
+
   useLayoutEffect(() => {
     if (!isInternalRender.current) {
       // Calculate time taken for render + commit
-      lastRenderTimeRef.current =
-        performance.now() - renderStartTimeRef.current;
+      const renderTime = performance.now() - renderStartTimeRef.current;
+      lastRenderTimeRef.current = renderTime;
+
+      // Detect Heavy V-DOM Calculation if we are in DOM-only mode
+      if (flashOnDOMUpdateOnly && renderTime >= hotRenderThresholdMs) {
+        setTimeout(() => {
+          // If after a macrotask the pendingCauses are STILL there, 
+          // it means MutationObserver never fired (DOM didn't mutate).
+          // But since it was a heavy render, we WARN the user anyway!
+          if (pendingCausesRef.current.length > 0) {
+            triggerFlash([...pendingCausesRef.current, `🔥 Heavy V-DOM (${renderTime.toFixed(1)}ms)`], 'hot');
+            pendingCausesRef.current = [];
+          }
+        }, 30);
+      }
     }
   });
 
@@ -106,38 +140,19 @@ export const RenderTraceDev: React.FC<RenderTraceDevProps> = ({
       }
 
       if (flashOnDOMUpdateOnly) {
-        // Queue the causes for the MutationObserver to pick up
+        // Queue it quietly
+        pendingCausesRef.current = allCauses;
         isInternalRender.current = true;
-        setPendingCauses(allCauses);
         setHasVdomRendered(true);
       } else {
-        // Trigger generic flash immediately
-        triggerFlash(allCauses);
+        triggerFlash(allCauses, 'normal');
       }
     }
 
     // Save current props/track for next external render
     prevPropsRef.current = props;
     prevTrackRef.current = track;
-  }); // Run on every render
-
-  const triggerFlash = (c: string[]) => {
-    renderCountRef.current += 1;
-    isInternalRender.current = true;
-    setCauses(c);
-    setIsFlashing(true);
-    setHasVdomRendered(false); // Reset vdom light because we have a real flash
-
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-
-    timeoutRef.current = setTimeout(() => {
-      // Mark the fade-out render as internal as well
-      isInternalRender.current = true;
-      setIsFlashing(false);
-    }, duration);
-  };
+  });
 
   // Setup Mutation Observer
   useEffect(() => {
@@ -147,7 +162,7 @@ export const RenderTraceDev: React.FC<RenderTraceDevProps> = ({
       let isRealMutation = false;
 
       for (const mutation of mutations) {
-        // If target is the container itself, check children that were added/removed
+        // Exclude mutations happening exactly on the wrapper specifically due to our overlay elements
         if (mutation.target === containerRef.current) {
           let hasRealChildChange = false;
           mutation.addedNodes.forEach((node) => {
@@ -161,14 +176,11 @@ export const RenderTraceDev: React.FC<RenderTraceDevProps> = ({
             }
           });
 
-          // Also check attributes on the container? We shouldn't change the container's own attributes
-          // other than style from our end, but let's just focus on child mutations.
           if (hasRealChildChange || mutation.type === 'attributes') {
-             // If attributes of the wrapper itself changed
              isRealMutation = true;
           }
         } else {
-          // Target is some child inside the wrapper. Check if it's inside our overlay.
+          // Inner mutations
           let current: HTMLElement | null = mutation.target as HTMLElement;
           let isOverlay = false;
           while (current && current !== containerRef.current) {
@@ -188,16 +200,11 @@ export const RenderTraceDev: React.FC<RenderTraceDevProps> = ({
 
       if (!isRealMutation) return;
 
-      // Only trigger if we have pending causes waiting from a recent render
-      if (pendingCauses.length > 0) {
-        triggerFlash(pendingCauses);
-        // Clear pending so we don't double trigger on same render batch
-        isInternalRender.current = true;
-        setPendingCauses([]);
+      if (pendingCausesRef.current.length > 0) {
+        triggerFlash(pendingCausesRef.current, 'normal');
+        pendingCausesRef.current = [];
       } else if (vdomRenderCountRef.current > 1) {
-        // Mutation happened without a known pending cause, might be deep child state change
-        // Only do this if it's not the initial mount
-        triggerFlash(["Deep DOM Mutation"]);
+        triggerFlash(["Deep DOM Mutation"], 'normal');
       }
     });
 
@@ -209,27 +216,19 @@ export const RenderTraceDev: React.FC<RenderTraceDevProps> = ({
     });
 
     return () => observer.disconnect();
-  }, [flashOnDOMUpdateOnly, pendingCauses, duration]);
+  }, [flashOnDOMUpdateOnly, duration]); // pendingCauses safely decoupled via ref
 
-  // Cleanup timeout
   useEffect(() => {
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
 
-  const showVdomDot =
-    flashOnDOMUpdateOnly &&
-    hasVdomRendered &&
-    !isFlashing &&
-    vdomRenderIndicator === "dot";
-  const showVdomBadge =
-    flashOnDOMUpdateOnly &&
-    hasVdomRendered &&
-    !isFlashing &&
-    vdomRenderIndicator === "badge";
+  const isFlashing = flashState !== 'none';
+  const showVdomDot = flashOnDOMUpdateOnly && hasVdomRendered && !isFlashing && vdomRenderIndicator === "dot";
+  const showVdomBadge = flashOnDOMUpdateOnly && hasVdomRendered && !isFlashing && vdomRenderIndicator === "badge";
+  
+  const activeColor = flashState === 'hot' ? '#ff9900' : color;
 
   return (
     <Wrapper
@@ -255,7 +254,7 @@ export const RenderTraceDev: React.FC<RenderTraceDevProps> = ({
           bottom: 0,
           pointerEvents: "none",
           boxSizing: "border-box",
-          border: `2px solid ${color}`,
+          border: `2px solid ${activeColor}`,
           opacity: isFlashing ? 1 : 0,
           transition: `opacity ${duration}ms ease-out`,
           zIndex: 9999,
@@ -296,7 +295,7 @@ export const RenderTraceDev: React.FC<RenderTraceDevProps> = ({
             pointerEvents: "none",
             backgroundColor: showVdomBadge
               ? "rgba(80, 80, 80, 0.4)"
-              : "rgba(150, 150, 150, 0.4)",
+              : (flashState === 'hot' ? 'rgba(255, 153, 0, 0.9)' : "rgba(150, 150, 150, 0.4)"),
             color: "#fff",
             padding: "4px 8px",
             borderRadius: "4px",
@@ -314,20 +313,20 @@ export const RenderTraceDev: React.FC<RenderTraceDevProps> = ({
           <div style={{ fontWeight: "bold" }}>
             {name}
             {showVdomBadge ? (
-              <span style={{ color: "#aaa", marginLeft: "4px" }}>
+              <span style={{ color: "#ccc", marginLeft: "4px" }}>
                 (V-DOM only)
               </span>
             ) : (
-              <span style={{ color }}>#{renderCountRef.current}</span>
+              <span style={{ color: flashState === 'hot' ? '#fff' : activeColor }}>#{renderCountRef.current}</span>
             )}
             <span
-              style={{ color: "#aaa", marginLeft: "6px", fontWeight: "normal" }}
+              style={{ color: "#eee", marginLeft: "6px", fontWeight: "normal" }}
             >
               ({lastRenderTimeRef.current.toFixed(1)} ms)
             </span>
           </div>
           {causes.map((cause, idx) => (
-            <div key={idx} style={{ color: "#aaa", fontSize: "9px" }}>
+            <div key={idx} style={{ color: "#fff", fontSize: "9px" }}>
               {cause}
             </div>
           ))}

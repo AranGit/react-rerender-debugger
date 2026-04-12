@@ -21,7 +21,7 @@ export function withRenderTrace<P extends object>(
   Component: React.ComponentType<P>,
   config?: RenderTraceConfig,
   name?: string
-): React.FC<P> {
+): React.FC<P & { track?: Record<string, any> }> {
   const componentName = name || Component.displayName || Component.name || 'Component';
 
   // DEV HOC
