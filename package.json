@@ -1,6 +1,6 @@
 {
   "name": "react-rerender-debugger",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "A lightweight React/Next.js wrapper to visually debug and analyze component re-renders with zero production overhead.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
