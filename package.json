@@ -25,6 +25,14 @@
   ],
   "author": "AranGit",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AranGit/react-rerender-debugger.git"
+  },
+  "homepage": "https://github.com/AranGit/react-rerender-debugger#readme",
+  "bugs": {
+    "url": "https://github.com/AranGit/react-rerender-debugger/issues"
+  },
   "peerDependencies": {
     "react": ">=16.8.0",
     "react-dom": ">=16.8.0"
